@@ -16,7 +16,7 @@ on:
         required: false
         type: boolean
         default: true
-        description: "Se deve taggear como latest"
+        description: "Se deve taggear como latest além do número da build"
     secrets:
       DOCKERHUB_USERNAME:
         required: true
@@ -42,14 +42,19 @@ jobs:
       - name: Gerar Tags
         id: meta
         run: |
-          TAGS="${{ secrets.DOCKERHUB_USERNAME }}/${{ inputs.image_name }}:${{ github.sha }}"
+          IMAGE_ID="${{ secrets.DOCKERHUB_USERNAME }}/${{ inputs.image_name }}"
+          
+          TAGS="$IMAGE_ID:v${{ github.run_number }}"
+          
           if [ "${{ inputs.tag_latest }}" = "true" ]; then
-            TAGS="$TAGS,${{ secrets.DOCKERHUB_USERNAME }}/${{ inputs.image_name }}:latest"
+            TAGS="$TAGS,$IMAGE_ID:latest"
           fi
+          
+          echo "As tags geradas serão: $TAGS"
           echo "tags=$TAGS" >> $GITHUB_OUTPUT
 
       - name: Build e Push da imagem
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v6
         with:
           context: .
           file: ${{ inputs.dockerfile_path }}
