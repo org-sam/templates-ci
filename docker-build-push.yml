@@ -1,0 +1,59 @@
+name: Reusable Docker Build & Push
+
+on:
+  workflow_call:
+    inputs:
+      image_name:
+        required: true
+        type: string
+        description: "Nome da imagem (ex: minha-app)"
+      dockerfile_path:
+        required: false
+        type: string
+        default: "./Dockerfile"
+        description: "Caminho para o Dockerfile"
+      tag_latest:
+        required: false
+        type: boolean
+        default: true
+        description: "Se deve taggear como latest"
+    secrets:
+      DOCKERHUB_USERNAME:
+        required: true
+      DOCKERHUB_TOKEN:
+        required: true
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout do código
+        uses: actions/checkout@v4
+
+      - name: Login no Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Configurar Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Gerar Tags
+        id: meta
+        run: |
+          TAGS="${{ secrets.DOCKERHUB_USERNAME }}/${{ inputs.image_name }}:${{ github.sha }}"
+          if [ "${{ inputs.tag_latest }}" = "true" ]; then
+            TAGS="$TAGS,${{ secrets.DOCKERHUB_USERNAME }}/${{ inputs.image_name }}:latest"
+          fi
+          echo "tags=$TAGS" >> $GITHUB_OUTPUT
+
+      - name: Build e Push da imagem
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ${{ inputs.dockerfile_path }}
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
